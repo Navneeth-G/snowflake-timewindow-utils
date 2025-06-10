@@ -20,7 +20,7 @@ from datetime import datetime, timedelta, time, timezone
 def main(session, pipeline_name, index_name, query_window_delta, tz, database_name, schema_name, table_name):
     """
     Identifies and inserts missing hourly records into the AUDIT table.
-    - Fixes the column count mismatch by providing all 17 columns.
+    - This version generates the timestamp inside the Python script.
     """
     
     fully_qualified_table_name = [database_name, schema_name, table_name]
@@ -55,13 +55,16 @@ def main(session, pipeline_name, index_name, query_window_delta, tz, database_na
 
     records_to_insert = []
     current_ts = start_ts
+    
+    # Get the current UTC time once. All records in this batch will share this timestamp.
+    python_generated_timestamp = datetime.now(timezone.utc)
 
     while current_ts < target_midnight:
         next_ts = current_ts + timedelta(minutes=query_window_delta)
         if next_ts > target_midnight:
             break
 
-        # CORRECTED: Dictionary now includes all 17 columns to match the table structure.
+        # MODIFIED: Dictionary now uses the Python-generated timestamp.
         records_to_insert.append({
             "DAG_RUN_TS": None,
             "PIPELINE_NAME": pipeline_name,
@@ -76,15 +79,15 @@ def main(session, pipeline_name, index_name, query_window_delta, tz, database_na
             "DIFF_PERCENTAGE": None,
             "ELT_START_TS": None,
             "AUDIT_START_TS": None,
-            "REC_INSERTED_TS": None, # Will be replaced by DEFAULT CURRENT_TIMESTAMP()
-            "REC_LAST_UPDATED_TS": None, # Will be replaced by DEFAULT CURRENT_TIMESTAMP()
+            "REC_INSERTED_TS": python_generated_timestamp,
+            "REC_LAST_UPDATED_TS": python_generated_timestamp,
             "STATUS": 'failed',
             "RETRY_ATTEMPT": 0 # Matches the DEFAULT 0
         })
         current_ts = next_ts
 
     if records_to_insert:
-        # CORRECTED: Schema now lists all 17 columns in the correct order.
+        # Schema lists all 17 columns in the correct order.
         schema = [
             "DAG_RUN_TS", "PIPELINE_NAME", "INDEX_NAME", "QUERY_WINDOW_START_TS",
             "QUERY_WINDOW_END_TS", "QUERY_WINDOW_DELTA", "ELASTICSEARCH_COUNT",
